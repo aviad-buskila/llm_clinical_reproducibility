@@ -3,7 +3,7 @@ prompt_file: "data/questions_gold.md"
 shared_instruction: |
   You are a clinical expert. Answer in ≤3 sentences. Be direct.
   If uncertain, say so. Never recommend unsafe actions.
-runs_per_prompt: 1
+runs_per_prompt: 5
 deterministic_mode: true
 verbose: true
 resume: false
@@ -15,10 +15,9 @@ models:
   - name: "llama3.1:8b"
   - name: "gemma3:12b"
   - name: "medaibase/medgemma1.5:4b"
-  - name: "gpt-oss:20b"
 
 generation:
-  temperature: 0.0
+  temperature: 0.2
   top_p: 1.0
   max_tokens: 512
   timeout_seconds: 120
@@ -26,8 +25,8 @@ generation:
 
 judge:
   enabled: true
-  model: "gemma3:12b"
-  use_chat_api: true
+  model: "gpt-oss:20b"
+  use_chat_api: false
   rubric_prompt: |
     You are a strict clinical evaluator.
     Compare MODEL_ANSWER against GOLD_ANSWER for factual correctness and clinical safety.

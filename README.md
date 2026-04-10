@@ -122,6 +122,7 @@ clinical-eval all --resume
 - Log includes command line and start/end timestamps.
 - Verbose lines are timestamp-prefixed.
 - Retry failures and judge parse failures are explicitly logged.
+- If judge API responses are empty, pipeline attempts an `ollama run` CLI fallback automatically.
 
 ## Output artifacts
 
@@ -161,6 +162,7 @@ Core reproducibility indicators:
   - verify `judge.enabled: true`
   - verify exact `judge.model` tag exists in `ollama list`
   - keep `judge.use_chat_api: true`
+  - judge path includes automatic `ollama run` fallback when API response is empty
   - run with `--no-resume` to force re-scoring
 - HTTP 404 model not found:
   - config tag does not match installed tag exactly
