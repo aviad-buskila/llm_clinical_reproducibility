@@ -6,9 +6,9 @@ Higher values indicate better alignment to gold answers.
 
 | model                    |   token_f1_avg |   string_similarity_avg |   exact_match_avg |   bleu_avg |   rouge_l_avg |   bertscore_f1_avg |   judge_score_avg |   token_f1_median |   string_similarity_median |   exact_match_median |   bleu_median |   rouge_l_median |   bertscore_f1_median |   judge_score_median |
 |:-------------------------|---------------:|------------------------:|------------------:|-----------:|--------------:|-------------------:|------------------:|------------------:|---------------------------:|---------------------:|--------------:|-----------------:|----------------------:|---------------------:|
-| llama3.1:8b              |          0.239 |                   0.046 |             0.000 |      0.023 |         0.142 |              0.835 |             0.580 |             0.226 |                      0.046 |                0.000 |         0.009 |            0.135 |                 0.829 |                0.600 |
-| medaibase/medgemma1.5:4b |          0.218 |                   0.042 |             0.000 |      0.023 |         0.126 |              0.838 |             0.450 |             0.235 |                      0.035 |                0.000 |         0.004 |            0.120 |                 0.822 |                0.400 |
-| gemma3:12b               |          0.200 |                   0.040 |             0.000 |      0.017 |         0.124 |              0.835 |             0.735 |             0.193 |                      0.042 |                0.000 |         0.008 |            0.117 |                 0.833 |                0.850 |
+| llama3.1:8b              |          0.277 |                   0.075 |             0.000 |      0.032 |         0.176 |              0.852 |             0.592 |             0.274 |                      0.045 |                0.000 |         0.013 |            0.167 |                 0.849 |                0.600 |
+| medaibase/medgemma1.5:4b |          0.249 |                   0.066 |             0.000 |      0.024 |         0.161 |              0.848 |             0.459 |             0.233 |                      0.040 |                0.000 |         0.010 |            0.146 |                 0.856 |                0.400 |
+| gemma3:12b               |          0.239 |                   0.065 |             0.000 |      0.020 |         0.150 |              0.847 |             0.600 |             0.218 |                      0.041 |                0.000 |         0.010 |            0.135 |                 0.858 |                0.700 |
 
 ## Part 2 - Within-Model Reproducibility (Ignoring Gold)
 
@@ -17,31 +17,36 @@ Higher values indicate better alignment to gold answers.
 
 | model                    |   normalized_self_agreement_rate |   normalized_response_uniqueness_rate |
 |:-------------------------|---------------------------------:|--------------------------------------:|
-| gemma3:12b               |                            0.240 |                                 0.960 |
-| llama3.1:8b              |                            0.200 |                                 1.000 |
-| medaibase/medgemma1.5:4b |                            0.200 |                                 1.000 |
+| gemma3:12b               |                            0.198 |                                 0.868 |
+| medaibase/medgemma1.5:4b |                            0.146 |                                 0.936 |
+| llama3.1:8b              |                            0.122 |                                 0.974 |
 
 ## Part 3 - Reproducibility by Model and Question
 
 Rows at the top are least reproducible and should be inspected first.
 
-| model                    | question_id   |   n_runs |   normalized_self_agreement_rate |   normalized_response_uniqueness_rate |
-|:-------------------------|:--------------|---------:|---------------------------------:|--------------------------------------:|
-| gemma3:12b               | q13114        |        5 |                            0.200 |                                 1.000 |
-| gemma3:12b               | q4199         |        5 |                            0.200 |                                 1.000 |
-| gemma3:12b               | q6039         |        5 |                            0.200 |                                 1.000 |
-| gemma3:12b               | q9076         |        5 |                            0.200 |                                 1.000 |
-| llama3.1:8b              | q11715        |        5 |                            0.200 |                                 1.000 |
-| llama3.1:8b              | q13114        |        5 |                            0.200 |                                 1.000 |
-| llama3.1:8b              | q4199         |        5 |                            0.200 |                                 1.000 |
-| llama3.1:8b              | q6039         |        5 |                            0.200 |                                 1.000 |
-| llama3.1:8b              | q9076         |        5 |                            0.200 |                                 1.000 |
-| medaibase/medgemma1.5:4b | q11715        |        5 |                            0.200 |                                 1.000 |
-| medaibase/medgemma1.5:4b | q13114        |        5 |                            0.200 |                                 1.000 |
-| medaibase/medgemma1.5:4b | q4199         |        5 |                            0.200 |                                 1.000 |
-| medaibase/medgemma1.5:4b | q6039         |        5 |                            0.200 |                                 1.000 |
-| medaibase/medgemma1.5:4b | q9076         |        5 |                            0.200 |                                 1.000 |
-| gemma3:12b               | q11715        |        5 |                            0.400 |                                 0.800 |
+| model       | question_id   |   n_runs |   normalized_self_agreement_rate |   normalized_response_uniqueness_rate |
+|:------------|:--------------|---------:|---------------------------------:|--------------------------------------:|
+| gemma3:12b  | q10308        |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q10686        |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q11564        |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q12291        |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q13241        |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q13275        |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q15174        |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q3145         |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q3555         |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q4227         |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q4448         |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q5470         |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q5780         |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q8526         |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q8618         |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q9144         |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q9257         |       10 |                            0.100 |                                 1.000 |
+| gemma3:12b  | q931          |       10 |                            0.100 |                                 1.000 |
+| llama3.1:8b | q10254        |       10 |                            0.100 |                                 1.000 |
+| llama3.1:8b | q10308        |       10 |                            0.100 |                                 1.000 |
 
 ## Part 4 - Global Model Comparison (Ignoring Question ID)
 
@@ -49,9 +54,9 @@ This section compares model output variability across all runs/questions togethe
 
 | model                    |   total_outputs |   unique_outputs |   unique_normalized_outputs |   global_response_uniqueness_rate |   global_normalized_uniqueness_rate |
 |:-------------------------|----------------:|-----------------:|----------------------------:|----------------------------------:|------------------------------------:|
-| gemma3:12b               |              25 |               24 |                          24 |                             0.960 |                               0.960 |
-| llama3.1:8b              |              25 |               25 |                          25 |                             1.000 |                               1.000 |
-| medaibase/medgemma1.5:4b |              25 |               25 |                          25 |                             1.000 |                               1.000 |
+| gemma3:12b               |             500 |              434 |                         434 |                             0.868 |                               0.868 |
+| medaibase/medgemma1.5:4b |             500 |              468 |                         468 |                             0.936 |                               0.936 |
+| llama3.1:8b              |             500 |              487 |                         487 |                             0.974 |                               0.974 |
 
 ## Part 5 - Pairwise Model Similarity Matrix
 
@@ -69,9 +74,9 @@ Per-run latency and output token throughput, aggregated at model level.
 
 | model                    |   latency_ms_avg |   output_tokens_avg |   tokens_per_second_avg |   latency_ms_median |   output_tokens_median |   tokens_per_second_median |
 |:-------------------------|-----------------:|--------------------:|------------------------:|--------------------:|-----------------------:|---------------------------:|
-| llama3.1:8b              |         2980.454 |             125.120 |                  42.924 |            2954.582 |                129.000 |                     43.992 |
-| medaibase/medgemma1.5:4b |         3475.675 |              94.400 |                  28.014 |            3153.806 |                 91.000 |                     28.761 |
-| gemma3:12b               |         3916.278 |              98.400 |                  25.273 |            3884.826 |                100.000 |                     25.793 |
+| llama3.1:8b              |         2534.837 |             109.230 |                  43.012 |            2526.519 |                108.500 |                     43.099 |
+| medaibase/medgemma1.5:4b |         3074.574 |              88.356 |                  28.706 |            2985.106 |                 86.000 |                     28.770 |
+| gemma3:12b               |         4024.542 |             102.582 |                  25.494 |            3973.639 |                101.000 |                     25.575 |
 
 ## Reading Guide
 - Use Part 1 to compare clinical answer quality versus gold.
