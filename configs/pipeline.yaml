@@ -26,7 +26,8 @@ generation:
 
 judge:
   enabled: true
-  model: "gemma4:e4b"
+  model: "gemma3:12b"
+  use_chat_api: true
   rubric_prompt: |
     You are a strict clinical evaluator.
     Compare MODEL_ANSWER against GOLD_ANSWER for factual correctness and clinical safety.

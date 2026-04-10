@@ -60,37 +60,122 @@ def write_markdown_report(
     out_dir.mkdir(parents=True, exist_ok=True)
     report_path = out_dir / "report.md"
 
-    summary_cols = [
+    quality_cols = [
         "token_f1",
         "string_similarity",
         "exact_match",
         "bleu",
         "rouge_l",
         "bertscore_f1",
+        "judge_score",
     ]
-    summary_cols = [c for c in summary_cols if c in scored_df.columns]
-    model_summary = scored_df.groupby("model", dropna=False)[summary_cols].mean().sort_values(
-        "token_f1", ascending=False
+    quality_cols = [c for c in quality_cols if c in scored_df.columns]
+    model_quality_mean = scored_df.groupby("model", dropna=False)[quality_cols].mean()
+    model_quality_median = scored_df.groupby("model", dropna=False)[quality_cols].median()
+    quality_table = model_quality_mean.join(
+        model_quality_median,
+        lsuffix="_avg",
+        rsuffix="_median",
     )
-    top_rows = aggregate_df.sort_values("token_f1_mean", ascending=False).head(10)
+    if "token_f1_avg" in quality_table.columns:
+        quality_table = quality_table.sort_values("token_f1_avg", ascending=False)
+
+    reproducibility_cols = [
+        "normalized_self_agreement_rate",
+        "normalized_response_uniqueness_rate",
+    ]
+    reproducibility_cols = [c for c in reproducibility_cols if c in aggregate_df.columns]
+    reproducibility_by_model = (
+        aggregate_df.groupby("model", dropna=False)[reproducibility_cols]
+        .mean()
+        .reset_index()
+    )
+    if "normalized_self_agreement_rate" in reproducibility_by_model.columns:
+        reproducibility_by_model = reproducibility_by_model.sort_values(
+            "normalized_self_agreement_rate", ascending=False
+        )
+
+    per_question_repro_cols = [
+        "model",
+        "question_id",
+        "n_runs",
+        "normalized_self_agreement_rate",
+        "normalized_response_uniqueness_rate",
+    ]
+    per_question_repro_cols = [c for c in per_question_repro_cols if c in aggregate_df.columns]
+    reproducibility_by_model_question = aggregate_df[per_question_repro_cols].copy()
+    if "normalized_self_agreement_rate" in reproducibility_by_model_question.columns:
+        reproducibility_by_model_question = reproducibility_by_model_question.sort_values(
+            ["normalized_self_agreement_rate", "normalized_response_uniqueness_rate"],
+            ascending=[True, False],
+        )
+
+    # Global model comparison (ignores question_id granularity).
+    global_model_cols = [c for c in ["model", "normalized_response", "response_text"] if c in scored_df.columns]
+    global_model_comparison = (
+        scored_df[global_model_cols]
+        .groupby("model", dropna=False)
+        .agg(
+            total_outputs=("response_text", "count"),
+            unique_outputs=("response_text", "nunique"),
+            unique_normalized_outputs=("normalized_response", "nunique"),
+        )
+        .reset_index()
+    )
+    global_model_comparison["global_response_uniqueness_rate"] = (
+        global_model_comparison["unique_outputs"] / global_model_comparison["total_outputs"]
+    )
+    global_model_comparison["global_normalized_uniqueness_rate"] = (
+        global_model_comparison["unique_normalized_outputs"] / global_model_comparison["total_outputs"]
+    )
+    global_model_comparison = global_model_comparison.sort_values(
+        "global_normalized_uniqueness_rate", ascending=True
+    )
 
     lines: list[str] = [
         "# Clinical Reproducibility Evaluation Report",
         "",
-        "## Model-level Means",
+        "## Part 1 - Model-vs-Gold Quality (Average and Median)",
         "",
-        _df_to_markdown_or_fallback(model_summary, floatfmt=".3f"),
+        "Higher values indicate better alignment to gold answers.",
         "",
-        "## Top Model/Question Results (Token F1 Mean)",
+        _df_to_markdown_or_fallback(quality_table, floatfmt=".3f"),
+        "",
+        "## Part 2 - Within-Model Reproducibility (Ignoring Gold)",
+        "",
+        "- `normalized_self_agreement_rate`: higher is better (same normalized answer repeated).",
+        "- `normalized_response_uniqueness_rate`: lower is better (less variability).",
         "",
         _df_to_markdown_or_fallback(
-            top_rows[["model", "question_id", "token_f1_mean", "string_similarity_mean"]],
+            reproducibility_by_model,
             index=False, floatfmt=".3f"
         ),
         "",
-        "## Notes",
-        "- This report aggregates repeated runs for reproducibility analysis.",
-        "- Inspect `outputs/figures/` for visualization artifacts.",
+        "## Part 3 - Reproducibility by Model and Question",
+        "",
+        "Rows at the top are least reproducible and should be inspected first.",
+        "",
+        _df_to_markdown_or_fallback(
+            reproducibility_by_model_question.head(20),
+            index=False,
+            floatfmt=".3f",
+        ),
+        "",
+        "## Part 4 - Global Model Comparison (Ignoring Question ID)",
+        "",
+        "This section compares model output variability across all runs/questions together.",
+        "",
+        _df_to_markdown_or_fallback(
+            global_model_comparison,
+            index=False,
+            floatfmt=".3f",
+        ),
+        "",
+        "## Reading Guide",
+        "- Use Part 1 to compare clinical answer quality versus gold.",
+        "- Use Part 2 to compare model stability across repeated runs.",
+        "- Use Part 3 to find specific unstable model/question pairs.",
+        "- Use Part 4 to compare overall model variability without question-level grouping.",
     ]
     report_path.write_text("\n".join(lines), encoding="utf-8")
     return report_path

@@ -23,6 +23,7 @@ class GenerationConfig(BaseModel):
 class JudgeConfig(BaseModel):
     enabled: bool = False
     model: str | None = None
+    use_chat_api: bool = True
     rubric_prompt: str = (
         "You are a strict clinical evaluator.\n"
         "Given QUESTION, GOLD_ANSWER and MODEL_ANSWER, score factual correctness from 0 to 1.\n"

@@ -53,7 +53,10 @@ def apply_llm_judge(scored_df: pd.DataFrame, config: PipelineConfig) -> pd.DataF
             f"{json.dumps(judge_payload, ensure_ascii=False)}"
         )
 
-        result = client.generate(model=judge_cfg.model, prompt=judge_prompt)
+        if judge_cfg.use_chat_api:
+            result = client.chat(model=judge_cfg.model, user_message=judge_prompt)
+        else:
+            result = client.generate(model=judge_cfg.model, prompt=judge_prompt)
         judge_text = str(result.get("response", "")).strip()
         if not judge_text:
             # One fallback attempt with a plain text format in case model struggles with JSON.
@@ -64,7 +67,10 @@ def apply_llm_judge(scored_df: pd.DataFrame, config: PipelineConfig) -> pd.DataF
                 f"GOLD_ANSWER: {row['gold_answer']}\n"
                 f"MODEL_ANSWER: {row['response_text']}\n"
             )
-            result = client.generate(model=judge_cfg.model, prompt=fallback_prompt)
+            if judge_cfg.use_chat_api:
+                result = client.chat(model=judge_cfg.model, user_message=fallback_prompt)
+            else:
+                result = client.generate(model=judge_cfg.model, prompt=fallback_prompt)
             judge_text = str(result.get("response", "")).strip()
 
         parsed = _extract_score(judge_text)
