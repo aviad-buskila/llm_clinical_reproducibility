@@ -77,7 +77,7 @@ When publishing results, cite:
 All configured in `configs/pipeline.yaml`:
 
 - `ollama_base_url` - Ollama server URL.
-- `prompt_file` - markdown gold data path.
+- `prompt_file` - gold CSV path (expects `question,answer` columns).
 - `shared_instruction` - common instruction for all model calls.
 - `models` - list of model tags, with optional per-model `runs_per_prompt`.
 - `runs_per_prompt` - global default repeats.
@@ -141,6 +141,7 @@ Under `outputs/`:
 
 - `raw_responses.jsonl`, `raw_responses.csv`, `raw_responses.parquet`
 - `scored_responses.csv`, `scored_responses.parquet`
+  - includes per-run performance fields: `latency_ms`, `output_tokens`, `tokens_per_second`
 - `aggregates.csv`
 - `report.md`
 - `figures/`:
@@ -158,6 +159,7 @@ Under `outputs/`:
 3. Reproducibility by model + question
 4. Global model comparison (ignoring question id)
 5. Pairwise model similarity matrix
+6. Performance summary (model-level latency/token stats)
 
 ### Part 1 metrics explained (Model-vs-Gold)
 
@@ -206,6 +208,18 @@ Under `outputs/`:
   - `1.0` means the two models always matched (after normalization),
   - `0.0` means they never matched.
 - Diagonal values are `1.0` by definition (model compared with itself).
+
+### Part 6 metrics explained (Performance, model level)
+
+- `latency_ms_avg` / `latency_ms_median`:
+  - response latency per run in milliseconds, aggregated by model.
+- `output_tokens_avg` / `output_tokens_median`:
+  - generated output token count per run (from Ollama `eval_count`).
+- `tokens_per_second_avg` / `tokens_per_second_median`:
+  - throughput computed as `output_tokens / latency_seconds`.
+- Interpretation:
+  - lower latency is faster,
+  - higher tokens/sec indicates better generation throughput.
 
 ## Reproducibility metrics
 

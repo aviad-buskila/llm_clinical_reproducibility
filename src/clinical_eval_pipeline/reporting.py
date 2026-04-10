@@ -81,6 +81,7 @@ def generate_figures(scored_df: pd.DataFrame, aggregate_df: pd.DataFrame, output
     plt.close()
 
     pairwise_similarity = _pairwise_model_similarity(scored_df)
+
     plt.figure(figsize=(10, 8))
     sns.heatmap(pairwise_similarity, annot=True, fmt=".2f", cmap="mako", vmin=0.0, vmax=1.0)
     plt.title("Pairwise Model Similarity (Normalized Output Exact Match)")
@@ -170,6 +171,20 @@ def write_markdown_report(
         "global_normalized_uniqueness_rate", ascending=True
     )
     pairwise_similarity = _pairwise_model_similarity(scored_df)
+    performance_cols = ["latency_ms", "output_tokens", "tokens_per_second"]
+    performance_cols = [c for c in performance_cols if c in scored_df.columns]
+    if performance_cols:
+        performance_mean = scored_df.groupby("model", dropna=False)[performance_cols].mean()
+        performance_median = scored_df.groupby("model", dropna=False)[performance_cols].median()
+        performance_table = performance_mean.join(
+            performance_median,
+            lsuffix="_avg",
+            rsuffix="_median",
+        )
+        if "latency_ms_avg" in performance_table.columns:
+            performance_table = performance_table.sort_values("latency_ms_avg", ascending=True)
+    else:
+        performance_table = pd.DataFrame({"note": ["Latency/token columns are unavailable."]})
 
     lines: list[str] = [
         "# Clinical Reproducibility Evaluation Report",
@@ -217,12 +232,19 @@ def write_markdown_report(
         "",
         _df_to_markdown_or_fallback(pairwise_similarity, floatfmt=".3f"),
         "",
+        "## Part 6 - Performance (Model Level)",
+        "",
+        "Per-run latency and output token throughput, aggregated at model level.",
+        "",
+        _df_to_markdown_or_fallback(performance_table, floatfmt=".3f"),
+        "",
         "## Reading Guide",
         "- Use Part 1 to compare clinical answer quality versus gold.",
         "- Use Part 2 to compare model stability across repeated runs.",
         "- Use Part 3 to find specific unstable model/question pairs.",
         "- Use Part 4 to compare overall model variability without question-level grouping.",
         "- Use Part 5 to compare direct model-to-model behavioral overlap.",
+        "- Use Part 6 to compare speed and token output characteristics across models.",
     ]
     report_path.write_text("\n".join(lines), encoding="utf-8")
     return report_path

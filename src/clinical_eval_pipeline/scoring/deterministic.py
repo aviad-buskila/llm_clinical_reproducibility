@@ -88,6 +88,12 @@ def score_deterministic(
     bertscore_batch_size: int = 8,
 ) -> pd.DataFrame:
     out = df.copy()
+    out["output_tokens"] = pd.to_numeric(out.get("eval_count"), errors="coerce")
+    duration_ns = pd.to_numeric(out.get("total_duration"), errors="coerce")
+    out["latency_ms"] = duration_ns / 1_000_000.0
+    out["tokens_per_second"] = out["output_tokens"] / (duration_ns / 1_000_000_000.0)
+    out.loc[duration_ns <= 0, "tokens_per_second"] = pd.NA
+
     out["normalized_response"] = out["response_text"].astype(str).map(normalize_text)
     out["normalized_gold"] = out["gold_answer"].astype(str).map(normalize_text)
     out["exact_match"] = (out["response_text"].astype(str) == out["gold_answer"].astype(str)).astype(float)
