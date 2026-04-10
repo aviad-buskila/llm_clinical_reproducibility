@@ -1,34 +1,37 @@
 # Ollama Clinical Reproducibility Pipeline
 
-Evaluate multiple Ollama-hosted text models on repeated short clinical prompts, compare against gold answers, and generate reproducibility metrics plus visual reports.
+Run repeated clinical prompt evaluations across multiple Ollama models, compare against gold answers, measure reproducibility, and generate structured reports/figures.
 
-## What This Pipeline Does
+## What this repository does
 
-- Runs the same prompt many times per model (`models x prompts x runs_per_prompt`).
-- Stores all raw outputs for traceability.
-- Scores outputs with deterministic metrics (exact match, normalized exact match, token F1, similarity).
-- Adds lexical/semantic metrics: BLEU, ROUGE-L, and BERTScore (RoBERTa-based).
-- Applies text normalization (lowercase, remove punctuation/non-letters, collapse spaces) before normalized comparisons.
-- Optionally applies an LLM judge rubric (also through Ollama).
-- Produces aggregates, figures, and a Markdown report.
+- Runs a grid of `models x prompts x runs_per_prompt`.
+- Persists all raw outputs with metadata.
+- Scores model outputs against gold answers using:
+  - exact/normalized exact match,
+  - token-level and string-level overlap,
+  - BLEU, ROUGE-L, BERTScore (RoBERTa),
+  - optional LLM-as-judge score/rationale.
+- Computes reproducibility/stability metrics across repeated runs.
+- Produces machine-readable outputs plus a multi-part Markdown report and plots.
 
-## Project Layout
+## Repository structure
 
-- `configs/pipeline.yaml` - models, run count, generation and output settings.
-- `data/questions_gold.md` - editable Markdown table containing clinical prompts and gold answers.
-- `src/clinical_eval_pipeline/` - pipeline implementation.
+- `configs/pipeline.yaml` - primary pipeline config.
+- `data/questions_gold.md` - editable markdown table of prompts + gold answers.
+- `src/clinical_eval_pipeline/` - CLI and pipeline modules.
 - `outputs/` - generated artifacts (ignored by git).
 
-## Prerequisites
+## Requirements
 
 - Python 3.10+
-- Local Ollama server running at `http://localhost:11434`
-- Required models pulled locally, e.g.:
+- Local Ollama server running on `http://localhost:11434`
+- Pulled model tags that exactly match config values:
 
-  - `ollama pull llama3`
-  - `ollama pull gemma3`
-  - `ollama pull gemma4`
-  - `ollama pull medgemma:1.5` (or whichever model tag you use)
+```bash
+ollama list
+```
+
+Use exact tags from that output in `configs/pipeline.yaml`.
 
 ## Install
 
@@ -38,9 +41,13 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-## Input Data Format (Markdown Table)
+Note: first BERTScore run downloads transformer weights and may be slower.
 
-Edit `data/questions_gold.md` and keep at least these required columns:
+## Input data format
+
+Edit `data/questions_gold.md` as a markdown table.
+
+Required columns:
 
 - `id`
 - `question`
@@ -52,62 +59,113 @@ Optional columns:
 - `category`
 - `notes`
 
-## Configure Models and Runs
+## Prompting behavior
 
-Edit `configs/pipeline.yaml`:
+- User prompt sent to model is exactly the `question` value.
+- Shared instruction is sent separately via config (`shared_instruction`) as system guidance.
 
-- `models`: list of Ollama model names/tags.
-- `shared_instruction`: common instruction sent to all models as system guidance.
-- `runs_per_prompt`: default number of repeats for every prompt/model.
-- Optional per-model override: `runs_per_prompt` under each model entry.
-- `judge.enabled`: enable hybrid scoring with LLM-as-judge.
-- `resume`: when `true`, skip already completed stages if artifacts exist.
-- `bertscore_model`: transformer model used by BERTScore (default `roberta-base`).
-- `bertscore_batch_size`: batch size for BERTScore calculation.
+## Configuration reference
 
-Prompting behavior:
+All configured in `configs/pipeline.yaml`:
 
-- The user prompt is exactly the `question` field from `data/questions_gold.md`.
-- `shared_instruction` is added separately as shared system instruction for every model call.
+- `ollama_base_url` - Ollama server URL.
+- `prompt_file` - markdown gold data path.
+- `shared_instruction` - common instruction for all model calls.
+- `models` - list of model tags, with optional per-model `runs_per_prompt`.
+- `runs_per_prompt` - global default repeats.
+- `generation` - `temperature`, `top_p`, `max_tokens`, `timeout_seconds`, `retries`.
+- `judge`:
+  - `enabled` - toggle LLM judge.
+  - `model` - judge model tag.
+  - `use_chat_api` - use `/api/chat` for judge calls (recommended).
+  - `rubric_prompt` - judge rubric text.
+- `resume` - skip completed stages when artifacts already exist.
+- `verbose` - detailed terminal/log progress.
+- `bertscore_model` - default `roberta-base`.
+- `bertscore_batch_size` - BERTScore batching.
+- `output` - output directory and file formats.
 
-## Run the Pipeline
+## Commands
+
+Defaults to `configs/pipeline.yaml`, so `--config-path` is optional.
 
 Run full pipeline:
 
 ```bash
-clinical-eval all --config-path configs/pipeline.yaml
+clinical-eval all
 ```
 
-Resume from existing artifacts (skip completed phases):
+Run phases separately:
 
 ```bash
+clinical-eval run
+clinical-eval score
+clinical-eval report
+```
+
+Useful flags:
+
+- `--resume/--no-resume` on `run`, `score`, `report`, `all`
+- `--sample N` on `run` and `all` (use first N questions only)
+
+Examples:
+
+```bash
+clinical-eval all --sample 2 --no-resume
 clinical-eval all --resume
 ```
 
-Or step-by-step:
+## Logging
 
-```bash
-clinical-eval run --config-path configs/pipeline.yaml
-clinical-eval score --config-path configs/pipeline.yaml
-clinical-eval report --config-path configs/pipeline.yaml
-```
+- Terminal output is mirrored to timestamped logs:
+  - `outputs/logs/pipeline_YYYYMMDD_HHMMSS.log`
+- Log includes command line and start/end timestamps.
+- Verbose lines are timestamp-prefixed.
+- Retry failures and judge parse failures are explicitly logged.
 
-`--resume/--no-resume` is also supported on `run`, `score`, `report`, and `all`.
-`--sample N` is supported on `run` and `all` to use only the first `N` questions from the gold file (default: all questions).
+## Output artifacts
 
-## Outputs
-
-Generated under `outputs/`:
+Under `outputs/`:
 
 - `raw_responses.jsonl`, `raw_responses.csv`, `raw_responses.parquet`
 - `scored_responses.csv`, `scored_responses.parquet`
 - `aggregates.csv`
 - `report.md`
-- `figures/*.png`
+- `figures/`:
+  - `model_token_f1_bar.png`
+  - `string_similarity_boxplot.png`
+  - `token_f1_heatmap.png`
+  - `pairwise_model_similarity_heatmap.png`
 
-## Reproducibility Notes
+## Report sections
 
-- Set `deterministic_mode: true` and `random_seed` in config for stable repeated runs.
-- Keep `temperature: 0.0` for reduced randomness when measuring consistency.
-- Record model tags explicitly (e.g., `model:version`) to avoid drift.
-- Aggregates include normalized self-agreement and normalized uniqueness for cross-run reproducibility.
+`outputs/report.md` includes:
+
+1. Model-vs-gold quality (average + median)
+2. Within-model reproducibility (ignoring gold)
+3. Reproducibility by model + question
+4. Global model comparison (ignoring question id)
+5. Pairwise model similarity matrix
+
+## Reproducibility metrics
+
+Core reproducibility indicators:
+
+- `normalized_self_agreement_rate` (higher is better)
+- `normalized_response_uniqueness_rate` (lower is better)
+- metric spread (`*_std`) across repeated runs
+
+## Troubleshooting
+
+- Judge returns empty/NaN:
+  - verify `judge.enabled: true`
+  - verify exact `judge.model` tag exists in `ollama list`
+  - keep `judge.use_chat_api: true`
+  - run with `--no-resume` to force re-scoring
+- HTTP 404 model not found:
+  - config tag does not match installed tag exactly
+- BERTScore errors:
+  - rerun `pip install -e .`
+  - ensure internet access for first model download
+- Partial/stale outputs:
+  - rerun with `--no-resume`

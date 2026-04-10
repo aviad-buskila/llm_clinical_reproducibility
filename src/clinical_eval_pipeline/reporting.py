@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+from clinical_eval_pipeline.scoring.deterministic import normalize_text
+
 
 def _df_to_markdown_or_fallback(df: pd.DataFrame, **kwargs) -> str:
     try:
@@ -13,6 +15,34 @@ def _df_to_markdown_or_fallback(df: pd.DataFrame, **kwargs) -> str:
     except ImportError:
         # Fallback keeps report generation working even if tabulate is missing.
         return df.to_string(index=kwargs.get("index", True))
+
+
+def _pairwise_model_similarity(scored_df: pd.DataFrame) -> pd.DataFrame:
+    df = scored_df.copy()
+    if "normalized_response" not in df.columns:
+        df["normalized_response"] = df["response_text"].astype(str).map(normalize_text)
+
+    aligned = df.pivot_table(
+        index=["question_id", "run_index"],
+        columns="model",
+        values="normalized_response",
+        aggfunc="first",
+    )
+    models = aligned.columns.tolist()
+    matrix = pd.DataFrame(1.0, index=models, columns=models, dtype=float)
+
+    for model_a in models:
+        for model_b in models:
+            a_vals = aligned[model_a]
+            b_vals = aligned[model_b]
+            mask = a_vals.notna() & b_vals.notna()
+            if mask.sum() == 0:
+                sim = 0.0
+            else:
+                sim = float((a_vals[mask] == b_vals[mask]).mean())
+            matrix.loc[model_a, model_b] = sim
+
+    return matrix
 
 
 def generate_figures(scored_df: pd.DataFrame, aggregate_df: pd.DataFrame, output_dir: str | Path) -> None:
@@ -48,6 +78,14 @@ def generate_figures(scored_df: pd.DataFrame, aggregate_df: pd.DataFrame, output
     plt.title("Token F1 Heatmap (Model x Question)")
     plt.tight_layout()
     plt.savefig(fig_dir / "token_f1_heatmap.png", dpi=160)
+    plt.close()
+
+    pairwise_similarity = _pairwise_model_similarity(scored_df)
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(pairwise_similarity, annot=True, fmt=".2f", cmap="mako", vmin=0.0, vmax=1.0)
+    plt.title("Pairwise Model Similarity (Normalized Output Exact Match)")
+    plt.tight_layout()
+    plt.savefig(fig_dir / "pairwise_model_similarity_heatmap.png", dpi=160)
     plt.close()
 
 
@@ -131,6 +169,7 @@ def write_markdown_report(
     global_model_comparison = global_model_comparison.sort_values(
         "global_normalized_uniqueness_rate", ascending=True
     )
+    pairwise_similarity = _pairwise_model_similarity(scored_df)
 
     lines: list[str] = [
         "# Clinical Reproducibility Evaluation Report",
@@ -171,11 +210,19 @@ def write_markdown_report(
             floatfmt=".3f",
         ),
         "",
+        "## Part 5 - Pairwise Model Similarity Matrix",
+        "",
+        "Cell value = fraction of aligned `(question_id, run_index)` pairs where two models "
+        "produced the exact same normalized output.",
+        "",
+        _df_to_markdown_or_fallback(pairwise_similarity, floatfmt=".3f"),
+        "",
         "## Reading Guide",
         "- Use Part 1 to compare clinical answer quality versus gold.",
         "- Use Part 2 to compare model stability across repeated runs.",
         "- Use Part 3 to find specific unstable model/question pairs.",
         "- Use Part 4 to compare overall model variability without question-level grouping.",
+        "- Use Part 5 to compare direct model-to-model behavioral overlap.",
     ]
     report_path.write_text("\n".join(lines), encoding="utf-8")
     return report_path
