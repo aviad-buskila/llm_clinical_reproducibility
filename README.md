@@ -203,6 +203,11 @@ Under `outputs/`:
   - `token_f1_heatmap.png`
   - `pairwise_model_similarity_heatmap.png`
 
+Quick link:
+
+- [Open latest generated report](outputs/report.md)
+  - Note: this file is generated/overwritten by the pipeline (`clinical-eval report` or `clinical-eval all`).
+
 ## Report sections
 
 `outputs/report.md` includes:
