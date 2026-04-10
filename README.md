@@ -148,6 +148,54 @@ Under `outputs/`:
 4. Global model comparison (ignoring question id)
 5. Pairwise model similarity matrix
 
+### Part 1 metrics explained (Model-vs-Gold)
+
+- `exact_match`: strict string equality against gold (`1` exact match, `0` otherwise).
+- `token_f1`: token overlap score after normalization (higher = better content overlap).
+- `string_similarity`: character-level similarity ratio on normalized text (higher = closer wording).
+- `bleu`: n-gram precision-oriented overlap (higher = closer phrasing to gold).
+- `rouge_l`: longest-common-subsequence F1-style overlap (higher = better structural/content overlap).
+- `bertscore_f1`: semantic similarity using contextual embeddings (higher = better semantic alignment).
+- `judge_score` (optional): LLM-judge rubric score from `0..1` (higher = better judged clinical quality).
+- Why both `avg` and `median`:
+  - `avg` captures overall trend,
+  - `median` is more robust to outlier generations.
+
+### Part 2 metrics explained (Within-model reproducibility, gold-independent)
+
+- `normalized_self_agreement_rate`:
+  - fraction of runs matching the modal normalized output for that model/question.
+  - higher = more stable/reproducible.
+- `normalized_response_uniqueness_rate`:
+  - number of unique normalized outputs divided by run count.
+  - lower = more stable/reproducible.
+- Interpretation:
+  - high agreement + low uniqueness implies deterministic/consistent behavior.
+  - low agreement + high uniqueness implies variable behavior across runs.
+
+### Part 3 metrics explained (Reproducibility by model and question)
+
+- Same reproducibility metrics as Part 2, but broken down per `question_id`.
+- Use this to identify unstable prompts for specific models.
+- Rows with low agreement/high uniqueness are instability hotspots.
+
+### Part 4 metrics explained (Global model comparison, no question grouping)
+
+- `total_outputs`: total generations produced by a model.
+- `unique_outputs`: distinct raw responses across all runs/questions.
+- `unique_normalized_outputs`: distinct responses after normalization.
+- `global_response_uniqueness_rate`: `unique_outputs / total_outputs`.
+- `global_normalized_uniqueness_rate`: `unique_normalized_outputs / total_outputs`.
+- Lower global uniqueness typically indicates higher overall consistency.
+
+### Part 5 metrics explained (Pairwise model similarity matrix)
+
+- Cell `(A, B)` is the fraction of aligned `(question_id, run_index)` pairs where models A and B produced the same normalized output.
+- Range is `0..1`:
+  - `1.0` means the two models always matched (after normalization),
+  - `0.0` means they never matched.
+- Diagonal values are `1.0` by definition (model compared with itself).
+
 ## Reproducibility metrics
 
 Core reproducibility indicators:
