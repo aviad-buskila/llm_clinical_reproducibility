@@ -1,9 +1,8 @@
 ollama_base_url: "http://localhost:11434"
 prompt_file: "data/questions_gold.md"
 shared_instruction: |
-  You are a clinical assistant.
-  Answer briefly and directly using medical best practices.
-  If uncertain, state uncertainty and avoid unsafe recommendations.
+  You are a clinical expert. Answer in ≤3 sentences. Be direct.
+  If uncertain, say so. Never recommend unsafe actions.
 runs_per_prompt: 1
 deterministic_mode: true
 verbose: true
@@ -14,6 +13,7 @@ models:
   - name: "llama3.1:8b"
   - name: "gemma3:12b"
   - name: "medaibase/medgemma1.5:4b"
+  - name: "gpt-oss:20b"
 
 generation:
   temperature: 0.0

@@ -109,7 +109,7 @@ def score(
         raw_df, out_dir = _read_raw(config_path)
         typer.echo(f"[score] loaded {len(raw_df)} raw rows")
         deterministic_df = score_deterministic(raw_df)
-        typer.echo("[score] deterministic scoring complete")
+        typer.echo("[score] normalization + deterministic scoring complete")
         scored_df = apply_llm_judge(deterministic_df, config)
         typer.echo("[score] llm-judge pass complete")
 
@@ -176,6 +176,7 @@ def run_all(
             scored_df = _read_scored(out_dir)
         else:
             deterministic_df = score_deterministic(raw_df)
+            typer.echo("[all] normalization + deterministic scoring complete")
             scored_df = apply_llm_judge(deterministic_df, config)
             out_path_parquet = out_dir / "scored_responses.parquet"
             out_path_csv = out_dir / "scored_responses.csv"

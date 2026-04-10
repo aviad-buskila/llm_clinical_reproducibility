@@ -7,6 +7,7 @@ Evaluate multiple Ollama-hosted text models on repeated short clinical prompts, 
 - Runs the same prompt many times per model (`models x prompts x runs_per_prompt`).
 - Stores all raw outputs for traceability.
 - Scores outputs with deterministic metrics (exact match, normalized exact match, token F1, similarity).
+- Applies text normalization (lowercase, remove punctuation/non-letters, collapse spaces) before normalized comparisons.
 - Optionally applies an LLM judge rubric (also through Ollama).
 - Produces aggregates, figures, and a Markdown report.
 
@@ -106,3 +107,4 @@ Generated under `outputs/`:
 - Set `deterministic_mode: true` and `random_seed` in config for stable repeated runs.
 - Keep `temperature: 0.0` for reduced randomness when measuring consistency.
 - Record model tags explicitly (e.g., `model:version`) to avoid drift.
+- Aggregates include normalized self-agreement and normalized uniqueness for cross-run reproducibility.
