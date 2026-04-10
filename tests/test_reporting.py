@@ -76,3 +76,16 @@ def test_write_markdown_report_includes_all_parts(tmp_path: Path) -> None:
     assert "## Part 3 - Reproducibility by Model and Question" in content
     assert "## Part 4 - Global Model Comparison (Ignoring Question ID)" in content
     assert "## Part 5 - Pairwise Model Similarity Matrix" in content
+
+
+def test_pairwise_model_similarity_no_overlap_rows_returns_zero_offdiag() -> None:
+    df = pd.DataFrame(
+        [
+            {"model": "m1", "question_id": "q1", "run_index": 0, "response_text": "A"},
+            {"model": "m2", "question_id": "q2", "run_index": 0, "response_text": "A"},
+        ]
+    )
+    matrix = _pairwise_model_similarity(df)
+    assert matrix.loc["m1", "m1"] == 1.0
+    assert matrix.loc["m2", "m2"] == 1.0
+    assert matrix.loc["m1", "m2"] == 0.0

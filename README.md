@@ -17,7 +17,7 @@ Run repeated clinical prompt evaluations across multiple Ollama models, compare 
 ## Repository structure
 
 - `configs/pipeline.yaml` - primary pipeline config.
-- `data/questions_gold.md` - editable markdown table of prompts + gold answers.
+- `data/gold_data.csv` - editable CSV of prompts + gold answers.
 - `src/clinical_eval_pipeline/` - CLI and pipeline modules.
 - `outputs/` - generated artifacts (ignored by git).
 
@@ -45,19 +45,27 @@ Note: first BERTScore run downloads transformer weights and may be slower.
 
 ## Input data format
 
-Edit `data/questions_gold.md` as a markdown table.
+Edit `data/gold_data.csv`.
 
 Required columns:
 
-- `id`
 - `question`
-- `gold_answer`
+- `answer`
 
-Optional columns:
+Notes:
 
-- `gold_keywords`
-- `category`
-- `notes`
+- The pipeline auto-generates internal IDs (`q1`, `q2`, ...).
+- `answer` is mapped internally to `gold_answer`.
+- Current gold dataset source: **MedQuAD** (medical question-answer pairs).
+- Reference: [A question entailment approach to question answering](https://link.springer.com/article/10.1186/s12859-019-3119-4).
+
+## Dataset provenance (MedQuAD)
+
+This repository currently uses `data/gold_data.csv` derived from MedQuAD-style medical Q/A content.
+
+When publishing results, cite:
+
+- Ben Abacha A, Demner-Fushman D. *A Question Entailment Approach to Question Answering*. BMC Bioinformatics. 2019. [https://link.springer.com/article/10.1186/s12859-019-3119-4](https://link.springer.com/article/10.1186/s12859-019-3119-4)
 
 ## Prompting behavior
 
@@ -107,12 +115,15 @@ Useful flags:
 
 - `--resume/--no-resume` on `run`, `score`, `report`, `all`
 - `--sample N` on `run` and `all` (use first N questions only)
+- `--sample-random N` on `run` and `all` (sample N random questions)
+- `--sample-seed <int>` with `--sample-random` for reproducible random sampling
 
 Examples:
 
 ```bash
 clinical-eval all --sample 2 --no-resume
 clinical-eval all --resume
+clinical-eval all --sample-random 50 --sample-seed 42 --no-resume
 ```
 
 ## Logging

@@ -8,7 +8,7 @@ import typer
 
 from clinical_eval_pipeline.aggregate import compute_aggregates, save_aggregates
 from clinical_eval_pipeline.config import load_config
-from clinical_eval_pipeline.io_markdown import load_questions_markdown
+from clinical_eval_pipeline.io_gold_csv import load_gold_csv
 from clinical_eval_pipeline.logging_utils import tee_terminal_to_log
 from clinical_eval_pipeline.reporting import generate_figures, write_markdown_report
 from clinical_eval_pipeline.runner import run_evaluations
@@ -66,11 +66,31 @@ def _apply_sample(questions: pd.DataFrame, sample: int | None) -> pd.DataFrame:
     return questions.head(sample).copy()
 
 
+def _apply_sampling(
+    questions: pd.DataFrame,
+    sample: int | None,
+    sample_random: int | None,
+    sample_seed: int | None,
+) -> pd.DataFrame:
+    if sample is not None and sample_random is not None:
+        raise ValueError("Use only one of --sample or --sample-random, not both.")
+    if sample is not None:
+        return _apply_sample(questions, sample)
+    if sample_random is not None:
+        if sample_random <= 0:
+            raise ValueError("--sample-random must be a positive integer")
+        n = min(sample_random, len(questions))
+        return questions.sample(n=n, random_state=sample_seed).reset_index(drop=True)
+    return questions
+
+
 @app.command()
 def run(
     config_path: str = "configs/pipeline.yaml",
     resume: bool | None = typer.Option(None, "--resume/--no-resume"),
     sample: int | None = typer.Option(None, "--sample", min=1),
+    sample_random: int | None = typer.Option(None, "--sample-random", min=1),
+    sample_seed: int | None = typer.Option(None, "--sample-seed"),
 ) -> None:
     """Run model inference loop and persist raw outputs."""
     config = load_config(config_path)
@@ -83,7 +103,12 @@ def run(
             typer.echo(f"[run] terminal output log -> {log_path}")
             return
         typer.echo(f"[run] loading questions from {config.prompt_file}")
-        questions = _apply_sample(load_questions_markdown(config.prompt_file), sample)
+        questions = _apply_sampling(
+            load_gold_csv(config.prompt_file),
+            sample=sample,
+            sample_random=sample_random,
+            sample_seed=sample_seed,
+        )
         typer.echo(f"[run] loaded {len(questions)} questions")
         raw_df = run_evaluations(config, questions)
         typer.echo(f"[run] saved raw outputs: {len(raw_df)} rows -> {config.output.output_dir}")
@@ -158,6 +183,8 @@ def run_all(
     config_path: str = "configs/pipeline.yaml",
     resume: bool | None = typer.Option(None, "--resume/--no-resume"),
     sample: int | None = typer.Option(None, "--sample", min=1),
+    sample_random: int | None = typer.Option(None, "--sample-random", min=1),
+    sample_seed: int | None = typer.Option(None, "--sample-seed"),
 ) -> None:
     """Run full pipeline: run -> score -> report."""
     config = load_config(config_path)
@@ -170,7 +197,12 @@ def run_all(
             typer.echo("[all] resume enabled: found raw outputs, skipping run phase")
             raw_df, _ = _read_raw(config_path)
         else:
-            questions = _apply_sample(load_questions_markdown(config.prompt_file), sample)
+            questions = _apply_sampling(
+                load_gold_csv(config.prompt_file),
+                sample=sample,
+                sample_random=sample_random,
+                sample_seed=sample_seed,
+            )
             typer.echo(f"[all] loaded {len(questions)} questions from {config.prompt_file}")
             raw_df = run_evaluations(config, questions)
             typer.echo(f"[all] run phase complete ({len(raw_df)} rows)")

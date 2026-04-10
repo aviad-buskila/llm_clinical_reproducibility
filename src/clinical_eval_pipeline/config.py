@@ -41,7 +41,7 @@ class OutputConfig(BaseModel):
 
 class PipelineConfig(BaseModel):
     ollama_base_url: str = "http://localhost:11434"
-    prompt_file: str = "data/questions_gold.md"
+    prompt_file: str = "data/gold_data.csv"
     shared_instruction: str | None = None
     models: list[ModelConfig]
     runs_per_prompt: int = Field(default=100, ge=1)
