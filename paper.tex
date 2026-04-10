@@ -1,0 +1,455 @@
+% ============================================================
+%  Reproducibility-First Evaluation of Small Open LLMs
+%  for Clinical Question Answering: A Practical Framework
+%  arXiv preprint — paste into Overleaf to compile
+% ============================================================
+
+\documentclass[11pt,twocolumn]{article}
+
+% ---- Packages -----------------------------------------------
+\usepackage[margin=0.75in,top=0.9in,bottom=0.9in]{geometry}
+\usepackage{times}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{amsmath}
+\usepackage{microtype}
+\usepackage{caption}
+\usepackage{setspace}
+
+\setlength{\columnsep}{0.25in}
+\captionsetup{font=small}
+
+% ---- Title / Author -----------------------------------------
+\title{\textbf{Reproducibility-First Evaluation of Small Open LLMs\\
+for Clinical Question Answering: A Practical Framework}}
+
+\author{
+  Aviad Buskila\\
+  \small Independent Researcher\\[-2pt]
+  \small \texttt{[contact e-mail]}
+}
+
+\date{}
+
+% =============================================================
+\begin{document}
+\maketitle
+
+% ---- Abstract -----------------------------------------------
+\begin{abstract}
+Deploying large language models (LLMs) in clinical settings demands
+more than high average accuracy: a model that returns substantively
+different answers each time it is queried is not a reliable clinical
+tool, regardless of its mean quality score.
+We present a practical, open-source evaluation framework for
+assessing small, locally-deployable open-weight LLMs on clinical
+question answering, treating \emph{reproducibility} as a first-class
+metric alongside lexical and semantic accuracy.
+Our pipeline computes eight quality metrics---including BERTScore,
+ROUGE-L, and an LLM-as-judge rubric---together with two
+within-model reproducibility metrics derived from repeated inference
+($N{=}10$ runs per question).
+Preliminary results on three models
+(Llama\,3.1\,8B, Gemma\,3\,12B, MedGemma\,1.5\,4B) evaluated on
+the MedQuAD benchmark reveal that despite low-temperature generation
+($T{=}0.2$), all three models exhibit near-complete response
+uniqueness across runs (self-agreement $\leq$0.24), highlighting a
+safety gap that single-pass benchmarks entirely miss.
+We describe the methodology in sufficient detail for practitioners
+to replicate or extend the evaluation for their own model selection
+workflows.
+\end{abstract}
+
+% ---- 1. Introduction ----------------------------------------
+\section{Introduction}
+
+The availability of capable open-weight LLMs that can run entirely
+on local hardware has made clinical AI accessible to resource-constrained
+settings where patient data cannot leave institutional boundaries.
+Models such as Llama\,3.1~\cite{dubey2024llama3},
+Gemma\,3~\cite{team2024gemma}, and domain-fine-tuned variants like
+MedGemma~\cite{medgemma2024} can now be queried on a commodity
+workstation, lowering both the cost and the compliance burden of
+piloting LLM-based clinical decision support.
+
+Yet the dominant evaluation paradigm for these models---benchmarking
+single-pass accuracy against a gold corpus---is fundamentally
+inadequate for clinical deployment.
+A drug-interaction query that returns a correct answer 70\% of the time
+and a plausible but wrong answer the other 30\% is not a useful clinical
+tool; neither is one that returns a different correct answer on every
+invocation, because the instability itself erodes clinician trust and
+auditability.
+In safety-critical applications, regulators and risk managers need to
+know not only \emph{whether} a model is usually correct, but
+\emph{how stable} those answers are.
+
+Existing clinical NLP benchmarks---MedQA~\cite{jin2021disease},
+PubMedQA~\cite{jin2019pubmedqa}, and others---evaluate single-pass
+accuracy and leave run-to-run variance unmeasured.
+Reproducibility as a standalone safety metric has received little
+systematic attention in the clinical NLP literature.
+
+This paper makes the following contributions:
+\begin{enumerate}
+  \item A \textbf{reproducibility-first evaluation protocol} that
+        quantifies within-model run-to-run consistency via
+        self-agreement rate and response uniqueness rate alongside
+        a standard accuracy suite.
+  \item A \textbf{modular, resumable, open-source pipeline} implementing
+        the protocol with a simple three-stage CLI
+        (\texttt{run\;$\to$\;score\;$\to$\;report}).
+  \item \textbf{Preliminary empirical results} on three small
+        open-weight models evaluated on MedQuAD, illustrating the
+        framework's ability to surface reproducibility failures even
+        in the near-deterministic temperature regime.
+\end{enumerate}
+
+% ---- 2. Methodology -----------------------------------------
+\section{Methodology}
+
+\subsection{Dataset}
+
+We use \textbf{MedQuAD}~\cite{abacha2019mqa}, a collection of
+60,048 medical question-answer pairs curated from fourteen NIH online
+health resources (NIHSeniorHealth, Genetics Home Reference, Cancer.gov,
+and others).
+Questions cover a wide range of clinical focus areas including symptoms,
+treatments, diagnoses, prevention, and prognosis.
+All content is in English and targeted at informed general audiences,
+making it a good proxy for consumer-facing clinical QA.
+
+For reproducible sampling, we draw question subsets using a fixed
+random seed (seed\,=\,42) so that any researcher can reconstruct the
+exact evaluation set.
+The full evaluation targets $N{=}50$ questions with 10 repeated
+inference runs per (model, question) pair; the preliminary results
+reported in Section~\ref{sec:results} cover an early snapshot.
+
+\subsection{Models and Inference Setup}
+
+We select three locally-deployable open-weight models to span a range
+of parameter counts and domain-specialization strategies, all served
+via the Ollama runtime~\cite{ollama}:
+
+\begin{itemize}
+  \item \textbf{Llama\,3.1\,8B}~\cite{dubey2024llama3} ---
+        Meta AI's instruction-tuned general-purpose model.
+        Represents the dominant open-weight baseline at the 8B scale.
+  \item \textbf{Gemma\,3\,12B}~\cite{team2024gemma} ---
+        Google DeepMind's instruction-tuned model at 12B parameters.
+        Provides a larger general-purpose comparison point.
+  \item \textbf{MedGemma\,1.5\,4B}~\cite{medgemma2024} ---
+        A Gemma-based 4B model fine-tuned on clinical corpora,
+        testing the hypothesis that domain specialization compensates
+        for smaller scale.
+\end{itemize}
+
+All three models receive an identical, fixed system instruction:
+\textit{``You are a clinical expert. Answer in $\leq$6\,sentences.
+Be direct. If uncertain, say so. Never recommend unsafe actions.''}
+Holding the system prompt constant isolates model behavior from
+prompt-engineering effects, which is essential for a fair comparison.
+
+Generation parameters are fixed across all models and all runs:
+temperature $T{=}0.2$, top-$p{=}1.0$, max\,tokens\,$=512$,
+request timeout\,=\,120\,s with two retries on failure.
+The choice of $T{=}0.2$ is deliberate: this is a common production
+default intended to reduce variance.
+Our key research question is how much variance \emph{remains} even
+in this near-deterministic regime.
+
+\subsection{Evaluation Metrics}
+\label{sec:metrics}
+
+We organize metrics into three groups.
+
+\paragraph{Quality metrics (vs.\ gold answer).}
+Each generated response is compared to the gold answer using six
+complementary metrics:
+(1)~\textbf{Exact Match}---binary equality after text normalization;
+(2)~\textbf{Token F1}---token-level precision/recall F1 on
+lowercased alphanumeric tokens;
+(3)~\textbf{String Similarity}---character-level SequenceMatcher ratio;
+(4)~\textbf{BLEU}~\cite{papineni2002bleu}---smoothed sentence-level
+$n$-gram overlap;
+(5)~\textbf{ROUGE-L}~\cite{lin2004rouge}---longest common subsequence F1;
+(6)~\textbf{BERTScore\,F1}~\cite{zhang2020bertscore}---contextual
+embedding similarity computed with \texttt{roberta-base}.
+Exact match and token F1 reward lexical fidelity;
+BERTScore captures semantic equivalence even when the phrasing differs.
+
+\paragraph{LLM-as-judge score.}
+A separate judge LLM evaluates each response against the gold answer
+using a structured rubric:
+\textit{``Score from 0 to 1, where 1 means fully correct.
+Assess factual correctness and clinical safety.''}
+The judge score provides a holistic clinical quality signal that
+complements lexical overlap metrics and is robust to valid paraphrases
+of the gold answer~\cite{zheng2023judging}.
+
+\paragraph{Reproducibility metrics.}
+For each (model, question) pair, we compute two metrics over the
+$N$ repeated runs:
+
+\begin{itemize}
+  \item \textbf{Normalized self-agreement rate}---fraction of runs
+        whose normalized output matches the modal (most frequent)
+        normalized output.
+        A value of 1.0 indicates perfect consistency; $1/N$ indicates
+        every run produced a distinct response.
+  \item \textbf{Normalized response uniqueness rate}---number of
+        distinct normalized outputs divided by $N$.
+        A value of 1.0 indicates every run was unique.
+\end{itemize}
+
+Both metrics operate on text normalized by lowercasing,
+whitespace collapsing, and removal of non-alphanumeric characters,
+making them robust to trivial formatting differences.
+These two metrics are complementary: self-agreement emphasizes
+the \emph{stability} of the most likely output, while uniqueness
+measures the \emph{breadth} of the output distribution.
+
+\paragraph{Efficiency.}
+We record per-run latency (ms) and throughput (tokens/second)
+from the inference server, as practical deployment constraints
+frequently make efficiency a decisive factor.
+
+\subsection{Pipeline Architecture}
+
+The pipeline is implemented as a Python package with a CLI exposing
+three subcommands:
+
+\begin{itemize}
+  \item \texttt{clinical-eval run} --- queries each model for each
+        question $N$ times and stores raw responses as
+        JSONL/CSV/Parquet.
+  \item \texttt{clinical-eval score} --- applies the full metric
+        suite to every stored response.
+  \item \texttt{clinical-eval report} --- aggregates scored
+        responses and renders the six-section Markdown report.
+\end{itemize}
+
+The separation of generation from scoring is a key design choice:
+it allows the scoring step (including new metrics) to be re-run
+without re-querying the LLMs, which is expensive and introduces
+additional variance into the experiment.
+The pipeline is fully resumable---interrupted runs continue from
+where they left off---making it practical on commodity hardware
+where long jobs may be preempted.
+All raw outputs are retained as an audit trail, enabling downstream
+re-analysis without re-running models.
+
+A shared system prompt, fixed random seed, and version-pinned
+dependencies ensure that any researcher can reproduce the exact
+experimental conditions by cloning the repository and running
+\texttt{clinical-eval all --config configs/pipeline.yaml}.
+
+% ---- 3. Preliminary Results ---------------------------------
+\section{Preliminary Results}
+\label{sec:results}
+
+\noindent\textbf{Scope notice.}\;
+The following tables summarize a preliminary snapshot of 5 questions
+with 5 runs per model ($N_{\text{total}} = 75$ responses).
+The full evaluation (50 questions, 10 runs each) is ongoing;
+these numbers are included to illustrate the framework's output
+and should not yet be treated as conclusive.
+
+\begin{table}[h]
+\centering
+\caption{Quality metrics, preliminary ($n{=}5$ questions).
+Bold indicates best per column.}
+\label{tab:quality}
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Model} & \textbf{BERTScore} & \textbf{Token F1} & \textbf{Judge} \\
+\midrule
+Llama\,3.1\,8B      & 0.835 & \textbf{0.239} & 0.580 \\
+Gemma\,3\,12B        & 0.835 & 0.200 & \textbf{0.735} \\
+MedGemma\,1.5\,4B   & \textbf{0.838} & 0.218 & 0.450 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Reproducibility and efficiency, preliminary.
+For Agreement: higher is better.
+For Uniqueness: lower is better.}
+\label{tab:repro}
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Model} & \textbf{Agreement$\uparrow$} & \textbf{Uniqueness$\downarrow$} & \textbf{Tok/s$\uparrow$} \\
+\midrule
+Llama\,3.1\,8B      & 0.200 & 1.000 & \textbf{42.9} \\
+Gemma\,3\,12B        & \textbf{0.240} & \textbf{0.960} & 25.3 \\
+MedGemma\,1.5\,4B   & 0.200 & 1.000 & 28.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+BERTScore F1 is tightly clustered (0.835--0.838) across all models,
+suggesting broadly similar \emph{semantic} alignment with gold answers.
+The LLM judge, which evaluates holistic clinical correctness, reveals
+a much wider spread (0.450--0.735): the larger general-purpose model
+(Gemma\,3\,12B) scores highest despite lacking clinical fine-tuning.
+
+The reproducibility metrics show the most practically significant
+signal: at $T{=}0.2$, every model produces a unique normalized response
+on nearly every run.
+Gemma\,3\,12B achieves the highest self-agreement at just 0.24,
+meaning that even the most consistent model agrees with itself on
+only one in four runs.
+Pairwise output overlap between any two models is exactly 0.00 for all
+model pairs, indicating completely disjoint output spaces.
+
+% ---- 4. Discussion and Caveats ------------------------------
+\section{Discussion and Caveats}
+
+\paragraph{Reproducibility is not solved by low temperature.}
+The most actionable finding is that $T{=}0.2$ does not yield
+reproducible behavior in practice.
+Self-agreement rates of 0.20--0.24 mean that for a given clinical
+question, the same model is almost certain to give a different answer
+on the next invocation.
+For clinical deployment, this necessitates output-stabilization
+strategies: majority voting over multiple runs, confidence-score
+gating, or mandatory human-in-the-loop review before any LLM output
+is surfaced to a clinician.
+Single-pass benchmarks that report accuracy without also reporting
+variance conceal this risk entirely.
+
+\paragraph{Clinical fine-tuning does not guarantee superiority.}
+In our preliminary evaluation, MedGemma\,1.5\,4B's clinical fine-tuning
+did not translate to higher judge scores or better reproducibility
+relative to Gemma\,3\,12B (3$\times$ larger, no clinical fine-tuning).
+This is consistent with findings in the broader literature that scale
+often dominates domain adaptation when the target task is covered in
+pretraining~\cite{singhal2023large}.
+Practitioners should not assume that a clinically-branded model
+will outperform a larger general-purpose one.
+
+\paragraph{LLM-as-judge introduces its own variance.}
+The judge model provides a clinically meaningful holistic quality
+signal, but is itself stochastic.
+For production evaluations, we recommend running the judge multiple
+times per response and averaging, or adopting a deterministic
+rubric-grading approach where feasible.
+
+\paragraph{Dataset and generalization limitations.}
+MedQuAD consists of structured, consumer-oriented Q\&A pairs derived
+from curated NIH pages.
+Real clinical queries---drawn from EHR notes, patient portals, or
+intraoperative decision support systems---are noisier, more ambiguous,
+and often lack clean gold-standard answers.
+Future work should apply this framework to clinical note corpora
+(e.g., MIMIC-IV~\cite{johnson2023mimic}) and USMLE-style
+vignettes~\cite{jin2021disease}.
+
+\paragraph{Inference environment.}
+All results were obtained via the Ollama local inference server on a
+single workstation.
+Quantization level, hardware configuration, and batch size can affect
+generation quality and throughput; API-hosted counterparts of the same
+model families may exhibit different variance profiles.
+
+% ---- 5. Conclusion ------------------------------------------
+\section{Conclusion}
+
+We have presented a reproducibility-first evaluation framework for
+assessing small open-weight LLMs in clinical question answering.
+The core argument is simple: reproducibility should be treated as a
+first-class safety metric alongside accuracy, and single-pass
+benchmarks are insufficient for clinical deployment decisions.
+
+Our modular, resumable, open-source pipeline provides a practical
+starting point for practitioners who need to compare models for
+clinical deployment without access to large-scale compute
+infrastructure.
+The preliminary results---near-complete response uniqueness at
+$T{=}0.2$ across all three tested models---illustrate that the
+framework surfaces safety-relevant signals that standard benchmarks
+miss entirely.
+
+We invite the clinical NLP community to adopt reproducibility metrics
+as a standard component of LLM evaluation and to contribute to or
+build upon the framework.
+Full evaluation results will be released upon completion of the
+ongoing $N{=}50$ run.
+
+% ---- References ---------------------------------------------
+\begin{thebibliography}{99}
+
+\bibitem{abacha2019mqa}
+A.~Ben Abacha and D.~Demner-Fushman.
+\newblock A question entailment approach to question answering.
+\newblock \emph{BMC Bioinformatics}, 20(1):511, 2019.
+
+\bibitem{dubey2024llama3}
+A.~Dubey et~al.
+\newblock The Llama\,3 herd of models.
+\newblock \emph{arXiv preprint arXiv:2407.21783}, 2024.
+
+\bibitem{jin2021disease}
+D.~Jin et~al.
+\newblock What disease does this patient have? A large-scale open domain
+question answering dataset from medical exams.
+\newblock \emph{Applied Sciences}, 11(14):6421, 2021.
+
+\bibitem{jin2019pubmedqa}
+Q.~Jin et~al.
+\newblock PubMedQA: A biomedical research question answering dataset.
+\newblock In \emph{Proc.\ EMNLP}, 2019.
+
+\bibitem{johnson2023mimic}
+A.~E.~W. Johnson et~al.
+\newblock MIMIC-IV, a freely accessible electronic health record dataset.
+\newblock \emph{Scientific Data}, 10(1):1, 2023.
+
+\bibitem{lin2004rouge}
+C.-Y. Lin.
+\newblock ROUGE: A package for automatic evaluation of summaries.
+\newblock In \emph{Text Summarization Branches Out (ACL Workshop)}, 2004.
+
+\bibitem{medgemma2024}
+{Google DeepMind / medaibase contributors}.
+\newblock MedGemma: Clinically fine-tuned Gemma models.
+\newblock \url{https://huggingface.co/medaibase}, 2024.
+
+\bibitem{ollama}
+{Ollama Contributors}.
+\newblock Ollama: Run large language models locally.
+\newblock \url{https://ollama.com}, 2024.
+
+\bibitem{papineni2002bleu}
+K.~Papineni et~al.
+\newblock BLEU: A method for automatic evaluation of machine translation.
+\newblock In \emph{Proc.\ ACL}, 2002.
+
+\bibitem{singhal2023large}
+K.~Singhal et~al.
+\newblock Large language models encode clinical knowledge.
+\newblock \emph{Nature}, 620(7972):172--180, 2023.
+
+\bibitem{team2024gemma}
+{Gemma Team, Google DeepMind}.
+\newblock Gemma\,3 technical report.
+\newblock \emph{arXiv preprint arXiv:2503.19786}, 2025.
+
+\bibitem{zhang2020bertscore}
+T.~Zhang et~al.
+\newblock BERTScore: Evaluating text generation with BERT.
+\newblock In \emph{Proc.\ ICLR}, 2020.
+
+\bibitem{zheng2023judging}
+L.~Zheng et~al.
+\newblock Judging LLM-as-a-judge with MT-Bench and chatbot arena.
+\newblock In \emph{NeurIPS}, 2023.
+
+\end{thebibliography}
+
+\end{document}
