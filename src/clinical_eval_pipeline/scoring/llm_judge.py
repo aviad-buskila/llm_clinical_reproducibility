@@ -41,6 +41,12 @@ def apply_llm_judge(scored_df: pd.DataFrame, config: PipelineConfig) -> pd.DataF
     parse_failures = 0
 
     for _, row in out.iterrows():
+        if config.verbose:
+            print(
+                f"[judge] evaluating target_model={row['model']} question_id={row['question_id']} "
+                f"judge_model={judge_cfg.model} mode={'chat' if judge_cfg.use_chat_api else 'generate'}",
+                flush=True,
+            )
         judge_payload = {
             "instructions": judge_cfg.rubric_prompt,
             "question": str(row["question"]),
@@ -59,6 +65,12 @@ def apply_llm_judge(scored_df: pd.DataFrame, config: PipelineConfig) -> pd.DataF
             result = client.generate(model=judge_cfg.model, prompt=judge_prompt)
         judge_text = str(result.get("response", "")).strip()
         if not judge_text:
+            if config.verbose:
+                print(
+                    f"[judge][warn] empty response on primary prompt for target_model={row['model']} "
+                    f"question_id={row['question_id']} - trying fallback prompt",
+                    flush=True,
+                )
             # One fallback attempt with a plain text format in case model struggles with JSON.
             fallback_prompt = (
                 f"{judge_cfg.rubric_prompt}\n\n"
@@ -72,6 +84,12 @@ def apply_llm_judge(scored_df: pd.DataFrame, config: PipelineConfig) -> pd.DataF
             else:
                 result = client.generate(model=judge_cfg.model, prompt=fallback_prompt)
             judge_text = str(result.get("response", "")).strip()
+        if not judge_text:
+            print(
+                f"[judge][warn] empty response after fallback judge_model={judge_cfg.model} "
+                f"target_model={row['model']} question_id={row['question_id']}",
+                flush=True,
+            )
 
         parsed = _extract_score(judge_text)
         if parsed is None:
@@ -80,6 +98,13 @@ def apply_llm_judge(scored_df: pd.DataFrame, config: PipelineConfig) -> pd.DataF
             print(
                 f"[judge][warn] could not parse score judge_model={judge_cfg.model} "
                 f"target_model={row['model']} question_id={row['question_id']} output='{snippet}'",
+                flush=True,
+            )
+        elif config.verbose:
+            snippet = judge_text.replace("\n", " ")[:160]
+            print(
+                f"[judge] parsed score={parsed:.3f} target_model={row['model']} "
+                f"question_id={row['question_id']} output_preview='{snippet}'",
                 flush=True,
             )
         judge_scores.append(parsed)

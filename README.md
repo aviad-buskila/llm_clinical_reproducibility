@@ -2,6 +2,59 @@
 
 Run repeated clinical prompt evaluations across multiple Ollama models, compare against gold answers, measure reproducibility, and generate structured reports/figures.
 
+## Intro (Plain Language)
+
+This project helps answer a simple question:
+
+- If we ask several medical LLMs the same clinical questions many times, do they give:
+  - accurate answers, and
+  - consistent answers?
+
+You can think of this as a "lab test" for model reliability:
+
+- **Accuracy**: how close the answer is to a trusted reference ("gold answer").
+- **Reproducibility**: how stable the model is when you repeat the same test.
+
+The pipeline is designed so clinicians, researchers, and product teams can run repeatable experiments locally (via Ollama), then review clear summary tables and visuals without needing to write analysis code.
+
+## Methodology (What the pipeline does step by step)
+
+1. **Load gold dataset**
+   - Reads `data/gold_data.csv` (`question`, `answer`).
+   - `answer` is treated as the gold reference.
+2. **Run repeated generation**
+   - For each configured model, each question is asked multiple times (`runs_per_prompt`).
+   - Optional shared instruction is applied to all models.
+3. **Store raw evidence**
+   - Saves every generated response with run metadata (model, run index, latency, token counts, etc.).
+4. **Score against gold**
+   - Computes lexical + semantic metrics (exact match, token overlap, BLEU/ROUGE, BERTScore).
+   - Optional LLM-as-judge adds rubric-based scoring.
+5. **Measure reproducibility**
+   - Quantifies how much each model varies across repeated runs.
+   - Includes agreement and uniqueness-based stability indicators.
+6. **Aggregate + report**
+   - Produces model-level summaries, per-question stability views, pairwise model similarity, and performance tables.
+
+## How to use this if you are not a data scientist
+
+- Start with `clinical-eval all --sample-random 5` to run a small pilot.
+- Open `outputs/report.md` and read sections in order:
+  1. **Quality vs gold** - "Which model is most correct?"
+  2. **Within-model reproducibility** - "Which model is most stable?"
+  3. **By model + question** - "Which questions cause instability?"
+  4. **Global comparison** - "How variable is each model overall?"
+  5. **Pairwise similarity** - "Which models behave similarly?"
+  6. **Performance** - "Which model is fastest / most efficient?"
+- Use figures in `outputs/figures/` for presentations.
+
+Practical interpretation:
+
+- A "good" model in this framework usually has:
+  - high quality metrics (Part 1),
+  - high agreement + low uniqueness (Parts 2-4),
+  - acceptable latency/tokens-per-second (Part 6).
+
 ## What this repository does
 
 - Runs a grid of `models x prompts x runs_per_prompt`.

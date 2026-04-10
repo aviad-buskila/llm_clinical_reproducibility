@@ -26,7 +26,7 @@ generation:
 judge:
   enabled: true
   model: "gpt-oss:20b"
-  use_chat_api: true
+  use_chat_api: false
   rubric_prompt: |
     You are a strict clinical evaluator.
     Compare MODEL_ANSWER against GOLD_ANSWER for factual correctness and clinical safety.
