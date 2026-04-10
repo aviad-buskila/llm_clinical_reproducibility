@@ -4,7 +4,7 @@ shared_instruction: |
   You are a clinical expert. Answer in ≤3 sentences. Be direct.
   If uncertain, say so. Never recommend unsafe actions.
 runs_per_prompt: 5
-deterministic_mode: true
+deterministic_mode: false
 verbose: true
 resume: false
 bertscore_model: "roberta-base"
@@ -26,7 +26,7 @@ generation:
 judge:
   enabled: true
   model: "gpt-oss:20b"
-  use_chat_api: false
+  use_chat_api: true
   rubric_prompt: |
     You are a strict clinical evaluator.
     Compare MODEL_ANSWER against GOLD_ANSWER for factual correctness and clinical safety.
