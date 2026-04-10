@@ -43,6 +43,29 @@ class _TeeStream:
         self.stream_a.flush()
         self.stream_b.flush()
 
+    def isatty(self) -> bool:
+        try:
+            return bool(self.stream_a.isatty())
+        except Exception:
+            return False
+
+    def close(self) -> None:
+        # Do not close underlying terminal/log streams here; context manager owns lifecycle.
+        self.flush()
+
+    @property
+    def encoding(self) -> str:
+        return getattr(self.stream_a, "encoding", "utf-8")
+
+    def fileno(self) -> int:
+        if hasattr(self.stream_a, "fileno"):
+            return self.stream_a.fileno()
+        raise OSError("fileno is not available")
+
+    def __getattr__(self, name: str):
+        # Delegate any additional stream attributes/methods to the primary stream.
+        return getattr(self.stream_a, name)
+
 
 @contextmanager
 def tee_terminal_to_log(output_dir: str | Path, log_subdir: str, command_line: str) -> Generator[Path, None, None]:
