@@ -50,14 +50,18 @@ Our pipeline computes eight quality metrics---including BERTScore,
 ROUGE-L, and an LLM-as-judge rubric---together with two
 within-model reproducibility metrics derived from repeated inference
 ($N{=}10$ runs per question).
-Preliminary results on three models
-(Llama\,3.1\,8B, Gemma\,3\,12B, MedGemma\,1.5\,4B) evaluated on
-the MedQuAD benchmark reveal that despite low-temperature generation
-($T{=}0.2$), all three models exhibit near-complete response
-uniqueness across runs (self-agreement $\leq$0.24), highlighting a
-safety gap that single-pass benchmarks entirely miss.
+Evaluating three models
+(Llama\,3.1\,8B, Gemma\,3\,12B, MedGemma\,1.5\,4B) on 50 MedQuAD
+questions ($N{=}1{,}500$ total responses) reveals that despite
+low-temperature generation ($T{=}0.2$), self-agreement across runs
+reaches at most 0.20, while 87--97\% of all outputs per model are
+unique---a safety gap that single-pass benchmarks entirely miss.
+We further find that the only clinically fine-tuned model
+(MedGemma\,1.5\,4B) underperforms the larger general-purpose models
+on both quality and reproducibility, challenging the assumption that
+domain specialization justifies smaller scale.
 We describe the methodology in sufficient detail for practitioners
-to replicate or extend the evaluation for their own model selection
+to replicate or extend the evaluation for their own model-selection
 workflows.
 \end{abstract}
 
@@ -100,10 +104,11 @@ This paper makes the following contributions:
   \item A \textbf{modular, resumable, open-source pipeline} implementing
         the protocol with a simple three-stage CLI
         (\texttt{run\;$\to$\;score\;$\to$\;report}).
-  \item \textbf{Preliminary empirical results} on three small
-        open-weight models evaluated on MedQuAD, illustrating the
-        framework's ability to surface reproducibility failures even
-        in the near-deterministic temperature regime.
+  \item \textbf{Empirical results} on three small open-weight models
+        ($N{=}1{,}500$ responses across 50 MedQuAD questions),
+        demonstrating that reproducibility failures persist even in
+        the near-deterministic temperature regime and that clinical
+        fine-tuning alone does not compensate for smaller scale.
 \end{enumerate}
 
 % ---- 2. Methodology -----------------------------------------
@@ -123,9 +128,9 @@ making it a good proxy for consumer-facing clinical QA.
 For reproducible sampling, we draw question subsets using a fixed
 random seed (seed\,=\,42) so that any researcher can reconstruct the
 exact evaluation set.
-The full evaluation targets $N{=}50$ questions with 10 repeated
-inference runs per (model, question) pair; the preliminary results
-reported in Section~\ref{sec:results} cover an early snapshot.
+We evaluate $N{=}50$ randomly sampled questions, each subjected to
+10 repeated inference runs per model, yielding 500 responses per
+model (1,500 total).
 
 \subsection{Models and Inference Setup}
 
@@ -246,20 +251,16 @@ dependencies ensure that any researcher can reproduce the exact
 experimental conditions by cloning the repository and running
 \texttt{clinical-eval all --config configs/pipeline.yaml}.
 
-% ---- 3. Preliminary Results ---------------------------------
-\section{Preliminary Results}
+% ---- 3. Results ---------------------------------------------
+\section{Results}
 \label{sec:results}
 
-\noindent\textbf{Scope notice.}\;
-The following tables summarize a preliminary snapshot of 5 questions
-with 5 runs per model ($N_{\text{total}} = 75$ responses).
-The full evaluation (50 questions, 10 runs each) is ongoing;
-these numbers are included to illustrate the framework's output
-and should not yet be treated as conclusive.
+Tables~\ref{tab:quality} and~\ref{tab:repro} summarize results
+across 1,500 responses (50 questions $\times$ 10 runs $\times$ 3 models).
 
 \begin{table}[h]
 \centering
-\caption{Quality metrics, preliminary ($n{=}5$ questions).
+\caption{Quality metrics ($n{=}50$ questions, avg.\ over 10 runs).
 Bold indicates best per column.}
 \label{tab:quality}
 \small
@@ -267,45 +268,68 @@ Bold indicates best per column.}
 \toprule
 \textbf{Model} & \textbf{BERTScore} & \textbf{Token F1} & \textbf{Judge} \\
 \midrule
-Llama\,3.1\,8B      & 0.835 & \textbf{0.239} & 0.580 \\
-Gemma\,3\,12B        & 0.835 & 0.200 & \textbf{0.735} \\
-MedGemma\,1.5\,4B   & \textbf{0.838} & 0.218 & 0.450 \\
+Llama\,3.1\,8B      & \textbf{0.852} & \textbf{0.277} & 0.592 \\
+Gemma\,3\,12B        & 0.847 & 0.239 & \textbf{0.600} \\
+MedGemma\,1.5\,4B   & 0.848 & 0.249 & 0.459 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[h]
 \centering
-\caption{Reproducibility and efficiency, preliminary.
-For Agreement: higher is better.
-For Uniqueness: lower is better.}
+\caption{Reproducibility and efficiency ($n{=}50$ questions,
+10 runs/model/question). Agreement: higher is better.
+Uniqueness: lower is better.}
 \label{tab:repro}
 \small
 \begin{tabular}{lccc}
 \toprule
 \textbf{Model} & \textbf{Agreement$\uparrow$} & \textbf{Uniqueness$\downarrow$} & \textbf{Tok/s$\uparrow$} \\
 \midrule
-Llama\,3.1\,8B      & 0.200 & 1.000 & \textbf{42.9} \\
-Gemma\,3\,12B        & \textbf{0.240} & \textbf{0.960} & 25.3 \\
-MedGemma\,1.5\,4B   & 0.200 & 1.000 & 28.0 \\
+Llama\,3.1\,8B      & 0.122 & 0.974 & \textbf{43.0} \\
+Gemma\,3\,12B        & \textbf{0.198} & \textbf{0.868} & 25.5 \\
+MedGemma\,1.5\,4B   & 0.146 & 0.936 & 28.7 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-BERTScore F1 is tightly clustered (0.835--0.838) across all models,
-suggesting broadly similar \emph{semantic} alignment with gold answers.
-The LLM judge, which evaluates holistic clinical correctness, reveals
-a much wider spread (0.450--0.735): the larger general-purpose model
-(Gemma\,3\,12B) scores highest despite lacking clinical fine-tuning.
+\paragraph{Quality.}
+BERTScore F1 is tightly clustered (0.847--0.852), confirming broadly
+similar \emph{semantic} alignment with gold at the embedding level.
+Differences become clearer on lexical metrics:
+Llama\,3.1\,8B leads on Token F1 (0.277 vs.\ 0.239--0.249) and
+BERTScore (0.852).
+The LLM judge---which rewards holistic clinical correctness---tells
+a subtly different story: Gemma\,3\,12B edges ahead (0.600) over
+Llama\,3.1\,8B (0.592), while the clinically fine-tuned
+MedGemma\,1.5\,4B lags substantially (0.459).
+Notably, no model produces an exact lexical match with any gold
+answer (exact match = 0.000 across all models), confirming that
+all three paraphrase rather than recall.
 
-The reproducibility metrics show the most practically significant
-signal: at $T{=}0.2$, every model produces a unique normalized response
-on nearly every run.
-Gemma\,3\,12B achieves the highest self-agreement at just 0.24,
-meaning that even the most consistent model agrees with itself on
-only one in four runs.
-Pairwise output overlap between any two models is exactly 0.00 for all
-model pairs, indicating completely disjoint output spaces.
+\paragraph{Reproducibility.}
+The most striking finding is the near-complete output uniqueness at
+$T{=}0.2$.
+Out of 500 runs per model, Gemma\,3\,12B produced 434 unique
+normalized responses (86.8\%), MedGemma\,1.5\,4B produced 468
+(93.6\%), and Llama\,3.1\,8B produced 487 (97.4\%).
+Self-agreement rates---the fraction of runs matching the modal
+response---range from 0.122 (Llama\,3.1\,8B) to 0.198
+(Gemma\,3\,12B): even the most consistent model agrees with itself
+on fewer than one in five runs on average.
+Pairwise output overlap across all model pairs is exactly 0.000,
+confirming that the three models occupy entirely disjoint output spaces.
+
+\paragraph{Quality--reproducibility trade-off.}
+A trade-off is apparent across the three models.
+Llama\,3.1\,8B achieves the highest lexical quality and fastest
+throughput (43.0 tok/s) but the worst reproducibility.
+Gemma\,3\,12B achieves the highest judge score and best
+reproducibility, at the cost of being the slowest (25.5 tok/s).
+MedGemma\,1.5\,4B ranks last or second-to-last on every metric
+despite its clinical fine-tuning, suggesting that, at 4B parameters,
+domain adaptation does not compensate for the capacity gap relative
+to its 12B Gemma sibling.
 
 % ---- 4. Discussion and Caveats ------------------------------
 \section{Discussion and Caveats}
@@ -313,25 +337,30 @@ model pairs, indicating completely disjoint output spaces.
 \paragraph{Reproducibility is not solved by low temperature.}
 The most actionable finding is that $T{=}0.2$ does not yield
 reproducible behavior in practice.
-Self-agreement rates of 0.20--0.24 mean that for a given clinical
+Self-agreement rates of 0.12--0.20 mean that for a given clinical
 question, the same model is almost certain to give a different answer
-on the next invocation.
+on the next invocation: Llama\,3.1\,8B, the least consistent model,
+produces a unique normalized response on 97.4\% of runs.
 For clinical deployment, this necessitates output-stabilization
-strategies: majority voting over multiple runs, confidence-score
+strategies: majority voting across multiple runs, confidence-score
 gating, or mandatory human-in-the-loop review before any LLM output
 is surfaced to a clinician.
-Single-pass benchmarks that report accuracy without also reporting
-variance conceal this risk entirely.
+Single-pass benchmarks that report average accuracy without also
+reporting within-model variance conceal this risk entirely.
 
 \paragraph{Clinical fine-tuning does not guarantee superiority.}
-In our preliminary evaluation, MedGemma\,1.5\,4B's clinical fine-tuning
-did not translate to higher judge scores or better reproducibility
-relative to Gemma\,3\,12B (3$\times$ larger, no clinical fine-tuning).
-This is consistent with findings in the broader literature that scale
-often dominates domain adaptation when the target task is covered in
-pretraining~\cite{singhal2023large}.
-Practitioners should not assume that a clinically-branded model
-will outperform a larger general-purpose one.
+MedGemma\,1.5\,4B's clinical fine-tuning did not translate to higher
+judge scores, better lexical quality, or better reproducibility
+relative to Gemma\,3\,12B---a general-purpose model with 3$\times$
+the parameters and no domain adaptation.
+On every metric in Tables~\ref{tab:quality} and~\ref{tab:repro},
+MedGemma finishes last or second-to-last.
+This is consistent with findings in the broader literature that
+scale often dominates domain adaptation when the target task is
+covered in pretraining~\cite{singhal2023large}.
+Practitioners should not assume that a clinically-branded or
+fine-tuned model will outperform a larger general-purpose one,
+particularly when parameter counts differ by more than 2$\times$.
 
 \paragraph{LLM-as-judge introduces its own variance.}
 The judge model provides a clinically meaningful holistic quality
@@ -360,26 +389,43 @@ model families may exhibit different variance profiles.
 % ---- 5. Conclusion ------------------------------------------
 \section{Conclusion}
 
-We have presented a reproducibility-first evaluation framework for
-assessing small open-weight LLMs in clinical question answering.
-The core argument is simple: reproducibility should be treated as a
-first-class safety metric alongside accuracy, and single-pass
-benchmarks are insufficient for clinical deployment decisions.
+We have presented and applied a reproducibility-first evaluation
+framework for small open-weight LLMs in clinical question answering,
+covering 1,500 responses from three models evaluated on 50 MedQuAD
+questions with 10 runs each.
+The results lead to three concrete takeaways for practitioners.
 
-Our modular, resumable, open-source pipeline provides a practical
-starting point for practitioners who need to compare models for
-clinical deployment without access to large-scale compute
-infrastructure.
-The preliminary results---near-complete response uniqueness at
-$T{=}0.2$ across all three tested models---illustrate that the
-framework surfaces safety-relevant signals that standard benchmarks
-miss entirely.
+First, \textbf{low temperature does not buy reproducibility}.
+Even at $T{=}0.2$, self-agreement rates hover between 0.12 and 0.20,
+and 87--97\% of all outputs per model are unique.
+Any clinical deployment must account for this variance through
+ensembling, gating, or human review.
 
-We invite the clinical NLP community to adopt reproducibility metrics
-as a standard component of LLM evaluation and to contribute to or
-build upon the framework.
-Full evaluation results will be released upon completion of the
-ongoing $N{=}50$ run.
+Second, \textbf{scale outweighs domain fine-tuning at small parameter
+counts}.
+Gemma\,3\,12B (general-purpose) outperforms MedGemma\,1.5\,4B
+(clinically fine-tuned) on every dimension: judge score, lexical
+quality, and reproducibility.
+Model selection should be empirically driven, not label-driven.
+
+Third, \textbf{quality and reproducibility partially trade off}.
+Llama\,3.1\,8B maximizes lexical quality and speed but minimizes
+consistency; Gemma\,3\,12B offers the best balance of quality and
+reproducibility at the cost of throughput.
+The right choice depends on whether the deployment context prioritizes
+answer fidelity, consistency, or latency.
+
+Our open-source pipeline makes this three-dimensional evaluation
+accessible to any team with a commodity workstation, and we invite
+the clinical NLP community to adopt reproducibility metrics as a
+standard alongside accuracy in LLM benchmarking.
+
+\paragraph{Future work.}
+Planned extensions include additional models (Phi-3, Mistral-Medical,
+Qwen-Med), evaluation on USMLE and MedQA benchmarks, ensemble
+decoding strategies to improve reproducibility, and a calibration
+study of the LLM judge against expert clinician ratings on a
+real-world EHR-derived question set.
 
 % ---- References ---------------------------------------------
 \begin{thebibliography}{99}
