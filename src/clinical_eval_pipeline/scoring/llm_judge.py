@@ -10,10 +10,16 @@ from clinical_eval_pipeline.ollama_client import OllamaClient
 
 def _extract_score(text: str) -> float | None:
     match = re.search(r"score\s*=\s*([0-9]*\.?[0-9]+)", text.lower())
-    if not match:
-        return None
-    score = float(match.group(1))
-    return max(0.0, min(1.0, score))
+    if match:
+        score = float(match.group(1))
+        return max(0.0, min(1.0, score))
+
+    # Fallback: take first standalone float between 0 and 1 from the judge output.
+    fallback = re.search(r"\b(0(?:\.\d+)?|1(?:\.0+)?)\b", text.lower())
+    if fallback:
+        score = float(fallback.group(1))
+        return max(0.0, min(1.0, score))
+    return None
 
 
 def apply_llm_judge(scored_df: pd.DataFrame, config: PipelineConfig) -> pd.DataFrame:
@@ -31,6 +37,7 @@ def apply_llm_judge(scored_df: pd.DataFrame, config: PipelineConfig) -> pd.DataF
     out = scored_df.copy()
     judge_scores: list[float | None] = []
     judge_rationales: list[str] = []
+    parse_failures = 0
 
     for _, row in out.iterrows():
         judge_prompt = (
@@ -41,9 +48,23 @@ def apply_llm_judge(scored_df: pd.DataFrame, config: PipelineConfig) -> pd.DataF
         )
         result = client.generate(model=judge_cfg.model, prompt=judge_prompt)
         judge_text = str(result.get("response", "")).strip()
-        judge_scores.append(_extract_score(judge_text))
+        parsed = _extract_score(judge_text)
+        if parsed is None:
+            parse_failures += 1
+            snippet = judge_text.replace("\n", " ")[:220]
+            print(
+                f"[judge][warn] could not parse score for model={row['model']} "
+                f"question_id={row['question_id']} output='{snippet}'",
+                flush=True,
+            )
+        judge_scores.append(parsed)
         judge_rationales.append(judge_text)
 
     out["judge_score"] = judge_scores
     out["judge_rationale"] = judge_rationales
+    print(
+        f"[judge] completed rows={len(out)} parsed_scores={len(out) - parse_failures} "
+        f"parse_failures={parse_failures}",
+        flush=True,
+    )
     return out

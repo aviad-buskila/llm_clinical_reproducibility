@@ -8,6 +8,10 @@ import requests
 from clinical_eval_pipeline.config import GenerationConfig
 
 
+class OllamaRequestError(RuntimeError):
+    """Structured error for failed Ollama generate requests."""
+
+
 class OllamaClient:
     def __init__(self, base_url: str, generation_config: GenerationConfig) -> None:
         self.base_url = base_url.rstrip("/")
@@ -58,9 +62,18 @@ class OllamaClient:
                 return data
             except Exception as exc:  # broad on purpose for retry safety
                 last_error = exc
+                print(
+                    f"[ollama][warn] attempt={attempt + 1}/{retries + 1} model={model} "
+                    f"failed: {exc}",
+                    flush=True,
+                )
                 if attempt < retries:
                     time.sleep(1.5 * (attempt + 1))
                     continue
                 break
 
-        raise RuntimeError(f"Ollama request failed after retries: {last_error}") from last_error
+        prompt_preview = prompt.strip().replace("\n", " ")[:160]
+        raise OllamaRequestError(
+            f"Ollama request failed after retries model={model} url={url} "
+            f"prompt_preview='{prompt_preview}' last_error={last_error}"
+        ) from last_error

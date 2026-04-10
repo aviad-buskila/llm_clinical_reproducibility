@@ -25,7 +25,18 @@ def compute_aggregates(scored_df: pd.DataFrame) -> pd.DataFrame:
         / df.groupby(["model", "question_id"])["normalized_response"].transform("size")
     )
 
-    metrics = ["exact_match", "normalized_exact_match", "token_f1", "string_similarity"]
+    metrics = [
+        "exact_match",
+        "normalized_exact_match",
+        "token_f1",
+        "string_similarity",
+        "bleu",
+        "rouge_l",
+        "bertscore_precision",
+        "bertscore_recall",
+        "bertscore_f1",
+    ]
+    metrics = [m for m in metrics if m in df.columns]
     if "judge_score" in df.columns:
         metrics.append("judge_score")
 

@@ -108,7 +108,11 @@ def score(
         typer.echo("[score] loading raw outputs")
         raw_df, out_dir = _read_raw(config_path)
         typer.echo(f"[score] loaded {len(raw_df)} raw rows")
-        deterministic_df = score_deterministic(raw_df)
+        deterministic_df = score_deterministic(
+            raw_df,
+            bertscore_model=config.bertscore_model,
+            bertscore_batch_size=config.bertscore_batch_size,
+        )
         typer.echo("[score] normalization + deterministic scoring complete")
         scored_df = apply_llm_judge(deterministic_df, config)
         typer.echo("[score] llm-judge pass complete")
@@ -175,7 +179,11 @@ def run_all(
             typer.echo("[all] resume enabled: found scored outputs, skipping score phase")
             scored_df = _read_scored(out_dir)
         else:
-            deterministic_df = score_deterministic(raw_df)
+            deterministic_df = score_deterministic(
+                raw_df,
+                bertscore_model=config.bertscore_model,
+                bertscore_batch_size=config.bertscore_batch_size,
+            )
             typer.echo("[all] normalization + deterministic scoring complete")
             scored_df = apply_llm_judge(deterministic_df, config)
             out_path_parquet = out_dir / "scored_responses.parquet"

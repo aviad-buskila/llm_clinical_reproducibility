@@ -50,6 +50,8 @@ class PipelineConfig(BaseModel):
     deterministic_mode: bool = True
     verbose: bool = True
     resume: bool = False
+    bertscore_model: str = "roberta-base"
+    bertscore_batch_size: int = Field(default=8, ge=1)
     random_seed: int | None = None
     report_format: Literal["markdown"] = "markdown"
 

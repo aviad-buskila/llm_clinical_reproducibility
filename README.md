@@ -7,6 +7,7 @@ Evaluate multiple Ollama-hosted text models on repeated short clinical prompts, 
 - Runs the same prompt many times per model (`models x prompts x runs_per_prompt`).
 - Stores all raw outputs for traceability.
 - Scores outputs with deterministic metrics (exact match, normalized exact match, token F1, similarity).
+- Adds lexical/semantic metrics: BLEU, ROUGE-L, and BERTScore (RoBERTa-based).
 - Applies text normalization (lowercase, remove punctuation/non-letters, collapse spaces) before normalized comparisons.
 - Optionally applies an LLM judge rubric (also through Ollama).
 - Produces aggregates, figures, and a Markdown report.
@@ -61,6 +62,8 @@ Edit `configs/pipeline.yaml`:
 - Optional per-model override: `runs_per_prompt` under each model entry.
 - `judge.enabled`: enable hybrid scoring with LLM-as-judge.
 - `resume`: when `true`, skip already completed stages if artifacts exist.
+- `bertscore_model`: transformer model used by BERTScore (default `roberta-base`).
+- `bertscore_batch_size`: batch size for BERTScore calculation.
 
 Prompting behavior:
 

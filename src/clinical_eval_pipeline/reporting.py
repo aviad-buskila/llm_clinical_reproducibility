@@ -60,10 +60,17 @@ def write_markdown_report(
     out_dir.mkdir(parents=True, exist_ok=True)
     report_path = out_dir / "report.md"
 
-    model_summary = (
-        scored_df.groupby("model", dropna=False)[["token_f1", "string_similarity", "exact_match"]]
-        .mean()
-        .sort_values("token_f1", ascending=False)
+    summary_cols = [
+        "token_f1",
+        "string_similarity",
+        "exact_match",
+        "bleu",
+        "rouge_l",
+        "bertscore_f1",
+    ]
+    summary_cols = [c for c in summary_cols if c in scored_df.columns]
+    model_summary = scored_df.groupby("model", dropna=False)[summary_cols].mean().sort_values(
+        "token_f1", ascending=False
     )
     top_rows = aggregate_df.sort_values("token_f1_mean", ascending=False).head(10)
 
