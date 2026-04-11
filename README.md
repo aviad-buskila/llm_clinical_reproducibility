@@ -1,12 +1,12 @@
-# Ollama Clinical Reproducibility Pipeline
+# Ollama Medical Reproducibility Pipeline
 
-Run repeated clinical prompt evaluations across multiple Ollama models, compare against gold answers, measure reproducibility, and generate structured reports/figures.
+Run repeated medical prompt evaluations across multiple Ollama models, compare against gold answers, measure reproducibility, and generate structured reports/figures.
 
 ## Intro (Plain Language)
 
 This project helps answer a simple question:
 
-- If we ask several medical LLMs the same clinical questions many times, do they give:
+- If we ask several medical LLMs the same medical questions many times, do they give:
   - accurate answers, and
   - consistent answers?
 
@@ -227,7 +227,7 @@ Quick link:
 - `bleu`: n-gram precision-oriented overlap (higher = closer phrasing to gold).
 - `rouge_l`: longest-common-subsequence F1-style overlap (higher = better structural/content overlap).
 - `bertscore_f1`: semantic similarity using contextual embeddings (higher = better semantic alignment).
-- `judge_score` (optional): LLM-judge rubric score from `0..1` (higher = better judged clinical quality).
+- `judge_score` (optional): LLM-judge rubric score from `0..1` (higher = better judged medical quality).
 - Why both `avg` and `median`:
   - `avg` captures overall trend,
   - `median` is more robust to outlier generations.
